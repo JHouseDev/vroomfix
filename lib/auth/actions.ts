@@ -113,7 +113,10 @@ export async function signUp(prevState: any, formData: FormData) {
       }
     }
 
-    return { success: "Account created successfully! Please check your email to verify your account." }
+    return {
+      success: "Account created successfully! Please check your email to verify your account.",
+      redirect: "/auth/verify-email",
+    }
   } catch (error) {
     console.error("Sign up error:", error)
     return { error: "An unexpected error occurred. Please try again." }
@@ -156,6 +159,7 @@ export async function inviteUser(prevState: any, formData: FormData) {
   const firstName = formData.get("firstName")
   const lastName = formData.get("lastName")
   const roleId = formData.get("roleId")
+  const phone = formData.get("phone") // Declare phone variable
 
   if (!email || !firstName || !lastName || !roleId) {
     return { error: "All fields are required" }
@@ -188,6 +192,7 @@ export async function inviteUser(prevState: any, formData: FormData) {
         email: email.toString(),
         first_name: firstName.toString(),
         last_name: lastName.toString(),
+        phone: phone?.toString(),
       })
 
       if (profileError) {

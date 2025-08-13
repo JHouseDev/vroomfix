@@ -1,7 +1,8 @@
 "use client"
 
-import { useActionState } from "react"
+import { useActionState, useEffect } from "react"
 import { useFormStatus } from "react-dom"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,6 +29,13 @@ function SubmitButton() {
 
 export default function SignUpForm() {
   const [state, formAction] = useActionState(signUp, null)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (state?.redirect) {
+      router.push(state.redirect)
+    }
+  }, [state?.redirect, router])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -55,6 +63,7 @@ export default function SignUpForm() {
               </div>
             )}
 
+            {/* ... existing form fields ... */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="firstName" className="text-sm font-medium">
