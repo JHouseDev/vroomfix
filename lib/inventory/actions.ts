@@ -164,3 +164,137 @@ export async function createPurchaseOrder(formData: FormData) {
     return { error: "Failed to create purchase order" }
   }
 }
+
+export async function getPartsForJob(jobId: string) {
+  const supabase = createServerActionClient()
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "Not authenticated" }
+    }
+
+    const { data: profile } = await supabase.from("user_profiles").select("tenant_id").eq("user_id", user.id).single()
+    if (!profile) {
+      return { error: "User profile not found" }
+    }
+
+    // Get parts allocated to this job
+    const { data: allocatedParts, error } = await supabase
+      .from("job_parts_allocation")
+      .select(`
+        *,
+        part:inventory_parts(
+          id,
+          part_number,
+          name,
+          selling_price,
+          current_stock,
+          condition
+        )
+      `)
+      .eq("job_id", jobId)
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    return { data: allocatedParts }
+  } catch (error) {
+    return { error: "Failed to get job parts" }
+  }
+}
+
+export async function updateStockFromJobUsage(
+  jobId: string,
+  partUsage: Array<{ partId: string; quantityUsed: number }>,
+) {
+  const supabase = createServerActionClient()
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "Not authenticated" }
+    }
+
+    const { data: profile } = await supabase.from("user_profiles").select("tenant_id").eq("user_id", user.id).single()
+    if (!profile) {
+      return { error: "User profile not found" }
+    }
+
+    // Update stock levels and record movements
+    for (const usage of partUsage) {
+      // Get current stock
+      const { data: part } = await supabase
+        .from("inventory_parts")
+        .select("current_stock, name")
+        .eq("id", usage.partId)
+        .eq("tenant_id", profile.tenant_id)
+        .single()
+
+      if (!part) {
+        continue
+      }
+
+      const newStock = Math.max(0, part.current_stock - usage.quantityUsed)
+
+      // Update stock
+      await supabase.from("inventory_parts").update({ current_stock: newStock }).eq("id", usage.partId)
+
+      // Record movement
+      await supabase.from("inventory_movements").insert({
+        tenant_id: profile.tenant_id,
+        part_id: usage.partId,
+        movement_type: "out",
+        quantity: usage.quantityUsed,
+        reason: `Used on job ${jobId}`,
+        reference_id: jobId,
+        reference_type: "job",
+        user_id: user.id,
+      })
+    }
+
+    revalidatePath("/inventory")
+    revalidatePath(`/jobs/${jobId}`)
+    return { success: true }
+  } catch (error) {
+    return { error: "Failed to update stock from job usage" }
+  }
+}
+
+export async function getLowStockAlerts() {
+  const supabase = createServerActionClient()
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "Not authenticated" }
+    }
+
+    const { data: profile } = await supabase.from("user_profiles").select("tenant_id").eq("user_id", user.id).single()
+    if (!profile) {
+      return { error: "User profile not found" }
+    }
+
+    const { data: lowStockParts, error } = await supabase
+      .from("inventory_parts")
+      .select("id, part_number, name, current_stock, minimum_stock")
+      .eq("tenant_id", profile.tenant_id)
+      .filter("current_stock", "lte", "minimum_stock")
+      .order("name")
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    return { data: lowStockParts }
+  } catch (error) {
+    return { error: "Failed to get low stock alerts" }
+  }
+}
