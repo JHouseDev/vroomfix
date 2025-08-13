@@ -31,26 +31,28 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Refresh session if expired - required for Server Components
-  await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
   // Define route access rules
   const isPublicRoute =
     request.nextUrl.pathname === "/" ||
-    request.nextUrl.pathname.startsWith("/auth/") ||
     request.nextUrl.pathname.startsWith("/client-portal/") ||
     request.nextUrl.pathname.startsWith("/api/public/")
 
   const isAuthRoute =
     request.nextUrl.pathname.startsWith("/auth/login") ||
     request.nextUrl.pathname.startsWith("/auth/sign-up") ||
-    request.nextUrl.pathname === "/auth/callback"
+    request.nextUrl.pathname === "/auth/callback" ||
+    request.nextUrl.pathname.startsWith("/auth/verify-email")
+
+  if (session && isAuthRoute && request.nextUrl.pathname !== "/auth/callback") {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
+  }
 
   // Protected routes - redirect to login if not authenticated
   if (!isPublicRoute && !isAuthRoute) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
     if (!session) {
       const redirectUrl = new URL("/auth/login", request.url)
       return NextResponse.redirect(redirectUrl)
@@ -82,9 +84,11 @@ export async function updateSession(request: NextRequest) {
     }
 
     // Add user info to headers for use in components
-    res.headers.set("x-user-id", session.user.id)
-    res.headers.set("x-tenant-id", userProfile?.tenant_id || "")
-    res.headers.set("x-user-role", userProfile?.role?.name || "")
+    if (userProfile) {
+      res.headers.set("x-user-id", session.user.id)
+      res.headers.set("x-tenant-id", userProfile.tenant_id || "")
+      res.headers.set("x-user-role", userProfile.role?.name || "")
+    }
   }
 
   return res
