@@ -46,19 +46,26 @@ export function MobileNavigation() {
   const filteredItems = mobileNavItems.filter((item) => userRole && item.roles.includes(userRole))
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
-      <div className="flex items-center justify-around py-2">
-        {filteredItems.map((item) => (
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border z-40 safe-area-pb">
+      <div className="flex items-center justify-around px-2 py-3">
+        {filteredItems.slice(0, 5).map((item) => (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              "flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
-              pathname === item.href ? "text-primary" : "text-muted-foreground hover:text-foreground",
+              "flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 min-w-0 flex-1",
+              pathname === item.href
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
             )}
           >
-            <item.icon className={cn("w-5 h-5", pathname === item.href ? "text-primary" : "text-muted-foreground")} />
-            <span className="truncate max-w-[60px]">{item.title}</span>
+            <item.icon
+              className={cn(
+                "w-5 h-5 transition-colors",
+                pathname === item.href ? "text-primary" : "text-muted-foreground",
+              )}
+            />
+            <span className="truncate text-center leading-tight max-w-[50px]">{item.title}</span>
           </Link>
         ))}
       </div>

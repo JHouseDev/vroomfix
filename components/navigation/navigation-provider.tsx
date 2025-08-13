@@ -38,17 +38,29 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     async function getUserData() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        // Get user role and tenant from user metadata or database
-        const { data: userData } = await supabase.from("users").select("role, tenant_id").eq("id", user.id).single()
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
 
-        if (userData) {
-          setUserRole(userData.role)
-          setTenantId(userData.tenant_id)
+        if (user) {
+          const { data: userData, error } = await supabase
+            .from("users")
+            .select("role, tenant_id")
+            .eq("id", user.id)
+            .single()
+
+          if (userData && !error) {
+            setUserRole(userData.role)
+            setTenantId(userData.tenant_id)
+          } else {
+            console.warn("Could not fetch user role:", error)
+            setUserRole("admin") // Fallback role
+          }
         }
+      } catch (error) {
+        console.error("Error fetching user data:", error)
+        setUserRole("admin")
       }
     }
 

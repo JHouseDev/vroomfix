@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { useNavigation } from "./navigation-provider"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   LayoutDashboard,
   Briefcase,
@@ -113,57 +114,92 @@ export function Sidebar() {
     setExpandedItems((prev) => (prev.includes(title) ? prev.filter((item) => item !== title) : [...prev, title]))
   }
 
-  const filteredItems = navigationItems.filter((item) => userRole && item.roles.includes(userRole))
+  const filteredItems = userRole ? navigationItems.filter((item) => item.roles.includes(userRole)) : navigationItems // Show all items if no role is set yet
+
+  const NavItemComponent = ({ item, isChild = false }: { item: NavItem; isChild?: boolean }) => {
+    const content = (
+      <Link
+        href={item.href}
+        className={cn(
+          "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          isChild ? "px-3 py-2" : "px-3 py-3",
+          !isSidebarOpen && !isChild && "justify-center px-2",
+          pathname === item.href
+            ? "bg-sidebar-primary text-sidebar-primary-foreground"
+            : isChild
+              ? "text-muted-foreground"
+              : "text-sidebar-foreground",
+          "flex-1 min-w-0",
+        )}
+      >
+        <item.icon className={cn("flex-shrink-0", isChild ? "w-4 h-4" : "w-5 h-5")} />
+        {(isSidebarOpen || isChild) && <span className="truncate">{item.title}</span>}
+      </Link>
+    )
+
+    if (!isSidebarOpen && !isChild) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>{content}</TooltipTrigger>
+          <TooltipContent side="right" className="font-medium">
+            {item.title}
+          </TooltipContent>
+        </Tooltip>
+      )
+    }
+
+    return content
+  }
 
   return (
-    <>
+    <TooltipProvider>
       {/* Desktop Sidebar */}
       <div
         className={cn(
-          "hidden md:flex md:flex-col md:w-64 bg-sidebar border-r border-sidebar-border transition-all duration-300",
+          "hidden md:flex md:flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 h-full relative",
           isSidebarOpen ? "md:w-64" : "md:w-16",
         )}
       >
-        <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-          <div className={cn("flex items-center gap-2", !isSidebarOpen && "justify-center")}>
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-primary-foreground" />
+        <div className="flex items-center justify-between p-4 border-b border-sidebar-border min-h-[73px] relative">
+          <div className={cn("flex items-center gap-3", !isSidebarOpen && "justify-center w-full")}>
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+              <Briefcase className="w-6 h-6 text-primary-foreground" />
             </div>
             {isSidebarOpen && (
-              <div>
-                <h1 className="font-serif font-bold text-lg text-sidebar-foreground">FleetPro</h1>
-                <p className="text-xs text-muted-foreground">Fleet Management</p>
+              <div className="min-w-0">
+                <h1 className="font-serif font-bold text-lg text-sidebar-foreground truncate">FleetPro</h1>
+                <p className="text-xs text-muted-foreground truncate">Fleet Management</p>
               </div>
             )}
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(!isSidebarOpen)} className="hidden md:flex">
-            <Menu className="w-4 h-4" />
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarOpen(!isSidebarOpen)}
+            className={cn(
+              "flex-shrink-0 h-8 w-8 p-0 z-10",
+              isSidebarOpen
+                ? "relative"
+                : "absolute -right-3 top-1/2 -translate-y-1/2 bg-sidebar border border-sidebar-border shadow-md hover:bg-sidebar-accent",
+            )}
+          >
+            {isSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </Button>
         </div>
 
-        <ScrollArea className="flex-1 p-2">
-          <nav className="space-y-1">
+        <ScrollArea className="flex-1 px-3 py-4">
+          <nav className={cn("space-y-2", !isSidebarOpen && "space-y-1")}>
             {filteredItems.map((item) => (
               <div key={item.title}>
                 <div className="flex items-center">
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex-1",
-                      pathname === item.href
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                        : "text-sidebar-foreground",
-                    )}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                    {isSidebarOpen && <span>{item.title}</span>}
-                  </Link>
+                  <NavItemComponent item={item} />
                   {item.children && isSidebarOpen && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => toggleExpanded(item.title)}
-                      className="p-1 h-8 w-8"
+                      className="p-1 h-8 w-8 flex-shrink-0 ml-1"
                     >
                       {expandedItems.includes(item.title) ? (
                         <ChevronDown className="w-4 h-4" />
@@ -175,23 +211,11 @@ export function Sidebar() {
                 </div>
 
                 {item.children && isSidebarOpen && expandedItems.includes(item.title) && (
-                  <div className="ml-6 mt-1 space-y-1">
+                  <div className="ml-8 mt-2 space-y-1">
                     {item.children
-                      .filter((child) => userRole && child.roles.includes(userRole))
+                      .filter((child) => !userRole || child.roles.includes(userRole))
                       .map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className={cn(
-                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                            pathname === child.href
-                              ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                              : "text-muted-foreground",
-                          )}
-                        >
-                          <child.icon className="w-4 h-4" />
-                          <span>{child.title}</span>
-                        </Link>
+                        <NavItemComponent key={child.href} item={child} isChild />
                       ))}
                   </div>
                 )}
@@ -199,32 +223,36 @@ export function Sidebar() {
             ))}
           </nav>
         </ScrollArea>
+
+        {!userRole && (
+          <div className="p-2 text-xs text-muted-foreground border-t border-sidebar-border">Role: Loading...</div>
+        )}
       </div>
 
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div className="md:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setSidebarOpen(false)}>
           <div
-            className="fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border"
+            className="fixed left-0 top-0 h-full w-80 bg-sidebar border-r border-sidebar-border"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <Briefcase className="w-5 h-5 text-primary-foreground" />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                  <Briefcase className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <div>
                   <h1 className="font-serif font-bold text-lg text-sidebar-foreground">FleetPro</h1>
                   <p className="text-xs text-muted-foreground">Fleet Management</p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)}>
+              <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} className="h-8 w-8 p-0">
                 <X className="w-4 h-4" />
               </Button>
             </div>
 
-            <ScrollArea className="flex-1 p-2">
-              <nav className="space-y-1">
+            <ScrollArea className="flex-1 px-3 py-4">
+              <nav className="space-y-2">
                 {filteredItems.map((item) => (
                   <div key={item.title}>
                     <div className="flex items-center">
@@ -232,7 +260,7 @@ export function Sidebar() {
                         href={item.href}
                         onClick={() => setSidebarOpen(false)}
                         className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex-1",
+                          "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex-1",
                           pathname === item.href
                             ? "bg-sidebar-primary text-sidebar-primary-foreground"
                             : "text-sidebar-foreground",
@@ -246,7 +274,7 @@ export function Sidebar() {
                           variant="ghost"
                           size="sm"
                           onClick={() => toggleExpanded(item.title)}
-                          className="p-1 h-8 w-8"
+                          className="p-1 h-8 w-8 ml-1"
                         >
                           {expandedItems.includes(item.title) ? (
                             <ChevronDown className="w-4 h-4" />
@@ -258,9 +286,9 @@ export function Sidebar() {
                     </div>
 
                     {item.children && expandedItems.includes(item.title) && (
-                      <div className="ml-6 mt-1 space-y-1">
+                      <div className="ml-8 mt-2 space-y-1">
                         {item.children
-                          .filter((child) => userRole && child.roles.includes(userRole))
+                          .filter((child) => !userRole || child.roles.includes(userRole))
                           .map((child) => (
                             <Link
                               key={child.href}
@@ -273,8 +301,8 @@ export function Sidebar() {
                                   : "text-muted-foreground",
                               )}
                             >
-                              <child.icon className="w-4 h-4" />
-                              <span>{child.title}</span>
+                              <child.icon className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate">{child.title}</span>
                             </Link>
                           ))}
                       </div>
@@ -286,6 +314,6 @@ export function Sidebar() {
           </div>
         </div>
       )}
-    </>
+    </TooltipProvider>
   )
 }
